@@ -1,0 +1,73 @@
+---
+title: "Making regression tables with Stargazer and R"
+author: "Jasper Ginn"
+date: "Monday, July 14, 2014"
+output: pdf_document
+---
+
+One large advantage of using  <a href="http://www.r-project.org/" target="">R</a> over other statistical software programs, is that its open-source community gets to develop packages. One package which is particularly helpful is the <a href="http://cran.r-project.org/web/packages/stargazer/stargazer.pdf" target="">"stargazer" package</a>, which produces beautiful regression tables in HTML and LaTeX format.
+
+Suppose we take the <a href="http://archive.transparency.org/policy_research/surveys_indices/cpi/2006" target="">2006 Corruption Perception Index</a> (CPI) data which we downloaded in <a href="http://jasperginn.nl/?p=40" target="">this</a> post and create some tables with stargazer. I'll be using  <a href="http://www.r-project.org/" target="">R base package</a> and <a href="http://www.rstudio.com/" target="">Rstudio</a>, both of which are free to download.
+
+```{r}
+# Clean workspace 
+#rm(list=ls())
+# Set working directory
+setwd("E:\\Documents\\Private\\Wordpres\\Blog3_Stargazer\\")
+# Install packages (if needed)
+require(stargazer)
+# load CPI data
+CPI<-read.csv("CPI2006.txt",sep=";",header=TRUE)
+```
+
+Say we want to investigate the relationship between the CPI score and the range between the lower and upper error rate. The rationale being that countries with a higher CPI score (i.e. less corruption) deliver more accurate survey results than countries with lower CPI scores. Naturally, this relationship may not hold for any of a number of reasons. For example, when a country suffers from corruption but corruption isn't widespread, then it may be more difficult to observe, thus increasing the error rate. We'll first create a LaTeX table containing the summary statistics. 
+
+```{r,results='asis' }
+# Plot summary statistics
+stargazer(CPI,summary.logical=TRUE,type="latex",median=TRUE,no.space=FALSE,
+          single.row=FALSE,digits=1,title="Summary Statistics")
+```
+
+The table above is printed in HTML format. If you were using <a href="http://www.stat.uni-muenchen.de/~leisch/Sweave/" target="">Sweave</a> or <a href="http://yihui.name/knitr/" target="">Knitr</a>, you would change the 'type'-option to 'latex' and then turn it into a PDF file, as you can observe <a href="https://dl.dropboxusercontent.com/u/38011066/wp/Blog3_Stargazer.pdf" target="">by viewing this post in PDF format</a>. You can also print the above table in plain text:
+
+```{r}
+# Plot summary statistics
+stargazer(CPI,summary.logical=TRUE,type="text",median=TRUE,no.space=FALSE,
+          single.row=FALSE,digits=1,title="Summary Statistics")
+```
+
+In order to examine the relationship between the CPI variable and the error margin, let's create a scatterplot using the ggplot2 package:
+
+```{r}
+# Load the ggplot2 package
+require(ggplot2)
+# Plot a scratterplot between variables
+qplot(CPI_score,Conf_Range_Difference,data=CPI)
+```
+
+It looks like the data shows a curve where the confidence range is lowest at high and low scores, but becomes larger in the mid-level scores. In order to deal with this non-linear relationship, we simply plot a polynomial regression smoother:
+
+```{r}
+# Plot a scratterplot between variables
+qq<-qplot(CPI_score,Conf_Range_Difference,data=CPI)
+plot(qq + geom_smooth(method="lm",formula=y~x + I(x^2)))
+```
+
+All right, we now model the relationship using simple linear regression. Because the relationship appears to be non-linear, we'll include the polynomial relationship in the second model. The extra settings we're defining allow us to to further customize the output.
+
+```{r,results='asis'}
+# Model
+CPI$CPI_score=as.numeric(CPI$CPI_score)
+model1<-lm(Conf_Range_Difference~CPI_score,data=CPI)
+model2<-lm(Conf_Range_Difference~CPI_score + I(CPI_score^2),data=CPI)
+# Stargazer table
+stargazer(model1,model2, type="latex", table.placement="H", column.labels=c("Linear Model","Polynomial Model"), 
+          title="Example regression table",covariate.labels=c("CPI score","CPI score-squared"),
+          no.space=TRUE,single.row=TRUE,style="default",model.numbers=FALSE,multicolumn=FALSE, 
+          notes=c("These are some notes which replace the standard notes.", 
+                  "Standard errors are reported in parentheses underneath the coefficients.", 
+                  "Significance at p = 0.1, p = 0.5 and p = 0.01 are denoted by '*', '**' and",
+                  "'***' respectively"),notes.append=FALSE,notes.align="l")
+```
+
+That's it! That's how you use stargazer in combination with R. 
